@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.spatial.distance import cdist
 
 
 class KNN:
@@ -32,10 +33,15 @@ class KNN:
         else:
             dists = self.compute_distances_two_loops(X)
 
-        if self.train_y.dtype == np.bool:
+        if self.train_y.dtype == bool:
             return self.predict_labels_binary(dists)
         else:
             return self.predict_labels_multiclass(dists)
+    
+    def _validate_vector(u):
+        if u.ndim == 1:
+            return u
+        raise ValueError("Input vector should be 1-D.")
 
     def compute_distances_two_loops(self, X):
         '''
@@ -54,8 +60,9 @@ class KNN:
         dists = np.zeros((num_test, num_train), np.float32)
         for i_test in range(num_test):
             for i_train in range(num_train):
-                # TODO: Fill dists[i_test][i_train]
-                pass
+                l1 = abs(self.train_X[i_train] - X[i_test]).sum()
+                dists[i_test][i_train] = l1
+        return dists
 
     def compute_distances_one_loop(self, X):
         '''
@@ -73,9 +80,9 @@ class KNN:
         num_test = X.shape[0]
         dists = np.zeros((num_test, num_train), np.float32)
         for i_test in range(num_test):
-            # TODO: Fill the whole row of dists[i_test]
-            # without additional loops or list comprehensions
-            pass
+            l1 = abs(self.train_X - X[i_test]).sum(axis=1)
+            dists[i_test] = l1
+        return dists
 
     def compute_distances_no_loops(self, X):
         '''
@@ -91,10 +98,11 @@ class KNN:
         '''
         num_train = self.train_X.shape[0]
         num_test = X.shape[0]
-        # Using float32 to to save memory - the default is float64
-        dists = np.zeros((num_test, num_train), np.float32)
-        # TODO: Implement computing all distances with no loops!
-        pass
+        # Using float32 to save memory - the default is float64
+        # dists = np.zeros((num_test, num_train), np.float32)
+        dists = cdist(X, self.train_X, metric='cityblock')
+        # dists = np.abs(X[:, None] - self.train_X).sum(-1) # same time as the method with 2 loops, why its so long?
+        return dists
 
     def predict_labels_binary(self, dists):
         '''
@@ -109,11 +117,14 @@ class KNN:
            for every test sample
         '''
         num_test = dists.shape[0]
-        pred = np.zeros(num_test, np.bool)
+        pred = np.zeros(num_test, bool)
         for i in range(num_test):
             # TODO: Implement choosing best class based on k
             # nearest training samples
-            pass
+            # sort neighbors by distance, choose k nearest. check wich class is the most
+            knn_idx = np.argsort(dists[i])[:self.k]
+            knn_value = self.train_y[knn_idx]
+            pred[i] = np.argmax(np.bincount(knn_value))
         return pred
 
     def predict_labels_multiclass(self, dists):
@@ -129,10 +140,11 @@ class KNN:
            for every test sample
         '''
         num_test = dists.shape[0]
-        num_test = dists.shape[0]
-        pred = np.zeros(num_test, np.int)
+        pred = np.zeros(num_test, int)
         for i in range(num_test):
             # TODO: Implement choosing best class based on k
             # nearest training samples
-            pass
+            knn_idx = np.argsort(dists[i])[:self.k]
+            knn_value = self.train_y[knn_idx]
+            pred[i] = np.argmax(np.bincount(knn_value))
         return pred
