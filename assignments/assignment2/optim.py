@@ -23,6 +23,8 @@ class SGD:
 class MomentumSGD:
     """
     Implements Momentum SGD update
+    velocity = momentum * velocity - learning_rate * gradient 
+    w = w + velocity
     """
     def __init__(self, momentum=0.9):
         self.momentum = 0.9
@@ -42,4 +44,8 @@ class MomentumSGD:
         # TODO Implement momentum update
         # Hint: you'll need to introduce some variables to remember
         # velocity from the previous updates
-        raise Exception("Not implemented!")        
+        if not hasattr(self, 'velocity'):
+            self.velocity = np.zeros_like(w)
+
+        self.velocity = self.momentum * self.velocity - learning_rate * d_w
+        return w + self.velocity    

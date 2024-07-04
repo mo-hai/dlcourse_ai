@@ -1,4 +1,45 @@
 import numpy as np
+import math
+
+
+def softmax(predictions: np.array) -> np.array:
+    """
+    Computes probabilities from scores
+
+    Arguments:
+      predictions, np array, shape is either (N) or (batch_size, N) -
+        classifier output
+
+    Returns:
+      probs, np array of the same shape as predictions - 
+        probability for every class, 0..1
+    """
+
+    pred = predictions.copy()
+
+    x = np.exp(pred - np.max(pred, axis=1).reshape(pred.shape[0], -1)) # to avoid numerical instability
+    res = x / np.sum(x, axis=1).reshape(pred.shape[0], -1)
+    
+    assert res.shape == predictions.shape
+
+    return res
+
+
+def cross_entropy_loss(probs, target_index):
+    """
+    Computes cross-entropy loss
+
+    Arguments:
+      probs, np array, shape is either (N) or (batch_size, N) -
+        probabilities for every class
+      target_index: np array of int, shape is (1) or (batch_size) -
+        index of the true class for given sample(s)
+
+    Returns:
+      loss: single value
+    """
+    # minus sign is added to make it a loss function, so we minimize it
+    return - np.mean(np.log(probs[range(target_index.shape[0]), target_index.flatten()])) # can be sum instead of mean
 
 
 def l2_regularization(W, reg_strength):
@@ -13,8 +54,11 @@ def l2_regularization(W, reg_strength):
       loss, single value - l2 regularization loss
       gradient, np.array same shape as W - gradient of weight by l2 loss
     """
-    # TODO: Copy from the previous assignment
-    raise Exception("Not implemented!")
+    W_copy = W.copy()
+
+    loss = reg_strength * np.sum(W_copy ** 2)
+    grad = 2 * reg_strength * W_copy
+
     return loss, grad
 
 
@@ -33,10 +77,20 @@ def softmax_with_cross_entropy(preds, target_index):
       loss, single value - cross-entropy loss
       dprediction, np array same shape as predictions - gradient of predictions by loss value
     """
-    # TODO: Copy from the previous assignment
-    raise Exception("Not implemented!")
+    probs = softmax(preds)
+    loss = cross_entropy_loss(probs, target_index)
 
-    return loss, d_preds
+    # gradient of predictions by loss value
+    # dL/dw_ji = h_j * (y_pred_i - gt_i)
+    indxs = np.zeros(probs.shape)
+    indxs[[range(len(target_index))], target_index.flatten()] = 1
+    dpreds = probs - indxs
+
+    assert dpreds.shape == preds.shape
+
+    dpreds /= dpreds.shape[0]
+
+    return loss, dpreds
 
 
 class Param:
@@ -52,15 +106,20 @@ class Param:
 
 class ReLULayer:
     def __init__(self):
-        pass
+        self.relu_grad = None
 
-    def forward(self, X):
-        # TODO: Implement forward pass
-        # Hint: you'll need to save some information about X
-        # to use it later in the backward pass
-        raise Exception("Not implemented!")
+    def forward(self, X: np.array) -> np.array:
+        result = np.maximum(X, 0)
+        
+        self.relu_grad = result.copy()
+        self.relu_grad[self.relu_grad > 0] = 1
+        
+        assert self.relu_grad.shape == X.shape
+        assert X.max() == result.max()
 
-    def backward(self, d_out):
+        return result
+
+    def backward(self, d_out: np.array) -> np.array:
         """
         Backward pass
 
@@ -72,9 +131,8 @@ class ReLULayer:
         d_result: np array (batch_size, num_features) - gradient
           with respect to input
         """
-        # TODO: Implement backward pass
-        # Your final implementation shouldn't have any loops
-        raise Exception("Not implemented!")
+
+        d_result = self.relu_grad * d_out
         return d_result
 
     def params(self):
@@ -83,17 +141,17 @@ class ReLULayer:
 
 
 class FullyConnectedLayer:
-    def __init__(self, n_input, n_output):
+    def __init__(self, n_input: int, n_output: int):
         self.W = Param(0.001 * np.random.randn(n_input, n_output))
         self.B = Param(0.001 * np.random.randn(1, n_output))
         self.X = None
 
     def forward(self, X):
-        # TODO: Implement forward pass
-        # Your final implementation shouldn't have any loops
-        raise Exception("Not implemented!")
+        self.X = X.copy()
+        result = X @ self.params()['W'].value + self.params()['B'].value
+        return result
 
-    def backward(self, d_out):
+    def backward(self, d_out: np.array) -> np.array:
         """
         Backward pass
         Computes gradient with respect to input and
@@ -107,15 +165,10 @@ class FullyConnectedLayer:
         d_result: np array (batch_size, n_input) - gradient
           with respect to input
         """
-        # TODO: Implement backward pass
-        # Compute both gradient with respect to input
-        # and gradients with respect to W and B
-        # Add gradients of W and B to their `grad` attribute
 
-        # It should be pretty similar to linear classifier from
-        # the previous assignment
-
-        raise Exception("Not implemented!")
+        self.params()['W'].grad += self.X.T @ d_out # dW
+        self.params()['B'].grad += np.sum(d_out, axis=0).reshape(1, -1) # dB
+        d_input = d_out @ self.params()['W'].value.T # dX
 
         return d_input
 
